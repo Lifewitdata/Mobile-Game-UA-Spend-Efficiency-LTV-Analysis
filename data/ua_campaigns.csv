@@ -1,0 +1,11 @@
+campaign_id,channel,campaign_name,start_date,end_date
+1,paid_social,paid_social_campaign_1,2026-01-01,2026-04-01
+2,paid_social,paid_social_campaign_2,2026-01-01,2026-04-01
+3,paid_social,paid_social_campaign_3,2026-01-01,2026-04-01
+4,paid_search,paid_search_campaign_1,2026-01-01,2026-04-01
+5,paid_search,paid_search_campaign_2,2026-01-01,2026-04-01
+6,paid_search,paid_search_campaign_3,2026-01-01,2026-04-01
+7,cross_promo,cross_promo_campaign_1,2026-01-01,2026-04-01
+8,cross_promo,cross_promo_campaign_2,2026-01-01,2026-04-01
+9,cross_promo,cross_promo_campaign_3,2026-01-01,2026-04-01
+10,organic,organic_campaign_1,2026-01-01,2026-04-01
