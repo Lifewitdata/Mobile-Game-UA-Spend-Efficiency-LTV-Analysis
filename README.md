@@ -1,8 +1,8 @@
 # Mobile Game UA Spend Efficiency & LTV Analysis
 
-A reproducible portfolio analysis of synthetic mobile-game user-acquisition spend, player cohorts and monetisation, using the committed CSV snapshot.
+A reproducible portfolio analysis of synthetic mobile-game user-acquisition spend, player cohorts and monetisation. The repository contains the original baseline source snapshot and an optional extended event-level lab for ad delivery, retention and experiment measurement.
 
-## Headline findings
+## Baseline findings
 
 | Channel | Blended CAC | D90 LTV | D90 ROAS | Payback |
 |---|---:|---:|---:|---|
@@ -24,26 +24,28 @@ The weighted reallocation scenario proposes an additional ~$4,762 into cross_pro
 ```
 .
 ├── Mobile Game Efficiency & LTV Analysis.ipynb
-├── data/                         # committed source CSVs
-├── dashboard/app.py              # Streamlit dashboard
+├── data/                         # committed baseline source CSVs
+├── dashboard/app.py              # baseline + optional extended Streamlit lab
 ├── docs/
 │   ├── data_dictionary.md
+│   ├── extended_demo_guide.md
 │   ├── sql_run_guide.md
-│   ├── stakeholder_writeup.md
-│   └── *.png                     # analysis outputs
+│   └── stakeholder_writeup.md
 ├── sql/
 │   ├── schema.sql
-│   └── analysis_queries.sql
-├── scripts/generate_demo_data.py # deterministic QA fixtures; not a baseline overwrite
-├── tests/test_metrics.py
+│   ├── analysis_queries.sql
+│   ├── extended_demo_schema.sql
+│   └── extended_demo_queries.sql
+├── scripts/
+│   ├── generate_demo_data.py
+│   └── generate_extended_demo_data.py
+├── tests/
 ├── requirements.txt
 ├── LICENSE
 └── .github/workflows/validate.yml
 ```
 
-`data/sample_players.csv` is a 20-row sample fixture for inspection and lightweight examples. The full notebook reads only `data/players.csv`.
-
-## Run the notebook
+## Run the baseline notebook
 
 Python 3.11 recommended.
 
@@ -57,33 +59,38 @@ python -m pip install -r requirements.txt
 jupyter lab
 ```
 
-Open `Mobile Game Efficiency & LTV Analysis.ipynb` at the repository root and run all cells top to bottom. Inputs default to `data/`; figures are saved under `docs/`.
+Open `Mobile Game Efficiency & LTV Analysis.ipynb` at the repository root and run all cells. The committed inputs default to `data/`; figures are saved under `docs/`.
 
-To generate a separate deterministic synthetic dataset without overwriting the committed snapshot:
+## Extended synthetic monetisation, retention and experiment lab
+
+The original source does not contain ad requests/impressions/clicks, app IDs, demand partners, sessions, or experiment assignment/exposure. These are not inferred from revenue events. Instead, the repository includes a separate synthetic generator:
 
 ```bash
-python scripts/generate_demo_data.py
+python scripts/generate_extended_demo_data.py
 ```
 
-The script writes all five analysis CSVs plus a 20-row sample to `data/generated_demo/`. Use that alternative dataset by setting `UA_DATA_DIR=data/generated_demo` before starting Jupyter or Streamlit. The generated sample is a new synthetic scenario, not an exact recreation of the committed snapshot or its headline LTV/revenue results.
+It writes baseline-format CSVs plus `apps.csv`, `demand_partners.csv`, `player_app_mapping.csv`, `player_sessions.csv`, `ad_delivery_events.csv`, `experiment_assignments.csv`, `experiment_exposures.csv`, `experiment_player_outcomes.csv` and `demo_metadata.json` to `data/generated_extended/`. It never overwrites committed data. The manifest records the deterministic seed, row counts and synthetic origin.
 
-## Dashboard
+Launch the dashboard with the extended data:
 
-```bash
+**Windows PowerShell**
+```powershell
+$env:UA_DATA_DIR = "data/generated_extended"
 streamlit run dashboard/app.py
 ```
 
-The dashboard shows channel CAC, spend/install trends and country/platform mix. It reads the existing committed dataset; a hosted deployment is not configured.
+**macOS / Linux**
+```bash
+UA_DATA_DIR=data/generated_extended streamlit run dashboard/app.py
+```
+
+The dashboard then adds ad requests, fill rate, CTR, eCPM, app/partner cuts, cohort D1/D7/D30 retention and experiment assignment summaries. The full definitions and safeguards are in [docs/extended_demo_guide.md](docs/extended_demo_guide.md).
+
+**Important:** every additional app ID, partner ID, ad-delivery event, session, assignment, exposure and experiment outcome is generated demonstration data. The frequency-cap scenario intentionally simulates a treatment mechanism. Its outputs are not production evidence and must not be represented as real causal findings. Do not combine `ad_revenue_events.csv` and `ad_delivery_events.csv` into one ad ledger.
 
 ## SQL
 
-The query library targets **MySQL 8.0+**. Follow [docs/sql_run_guide.md](docs/sql_run_guide.md) to create the database, run the schema, import CSV files and verify counts and headline CAC outputs. Queries include CTEs, `RANK`, `LAG`, running totals and rolling averages.
-
-## Metric and source limitations
-
-See [docs/data_dictionary.md](docs/data_dictionary.md) for table grain, metric definitions and quality rules. The data provides spend, installs, country, platform, purchase transactions and ad-revenue events by ad type. It has no ad impressions/requests, app IDs, demand-partner IDs, sessions/activity, experiment assignment or exposure. Thus CTR, CVR, CPC, fill rate, eCPM, retention, app/partner splits and causal A/B statistics cannot be calculated; they are not fabricated.
-
-D120/D180 LTV is calculated only for cohorts with complete observation windows. The notebook will report when no cohort is eligible.
+Baseline SQL targets **MySQL 8.0+**. Follow [docs/sql_run_guide.md](docs/sql_run_guide.md) for the original schema and queries. To analyse extended tables, run `sql/extended_demo_schema.sql` after `sql/schema.sql`, then use `sql/extended_demo_queries.sql`.
 
 ## Validate
 
@@ -91,7 +98,7 @@ D120/D180 LTV is calculated only for cohorts with complete observation windows. 
 pytest -q
 ```
 
-GitHub Actions runs the tests and validates notebook JSON on pushes and pull requests.
+GitHub Actions runs tests, smoke-tests the synthetic generator, validates notebook JSON, and runs the baseline SQL and notebook checks.
 
 ## License
 
