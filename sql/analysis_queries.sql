@@ -116,15 +116,27 @@ LEFT JOIN (
 GROUP BY p.channel;
 
 
--- 9. IAP-only vs ad-only revenue split, by channel
-SELECT
-    p.channel,
-    ROUND(COALESCE(SUM(i.usd_amount), 0), 2) AS iap_revenue,
-    ROUND(COALESCE(SUM(a.revenue_usd), 0), 2) AS ad_revenue
-FROM players p
-LEFT JOIN iap_transactions i ON i.player_id = p.player_id
-LEFT JOIN ad_revenue_events a ON a.player_id = p.player_id
-GROUP BY p.channel;
+-- 9. IAP-only vs ad-only revenue split, by channel.
+-- Aggregate each event table before joining to avoid IAP x ad-event fan-out.
+WITH iap_by_channel AS (
+    SELECT p.channel, SUM(i.usd_amount) AS iap_revenue
+    FROM players p
+    JOIN iap_transactions i ON i.player_id = p.player_id
+    GROUP BY p.channel
+),
+ads_by_channel AS (
+    SELECT p.channel, SUM(a.revenue_usd) AS ad_revenue
+    FROM players p
+    JOIN ad_revenue_events a ON a.player_id = p.player_id
+    GROUP BY p.channel
+)
+SELECT c.channel,
+       ROUND(COALESCE(i.iap_revenue, 0), 2) AS iap_revenue,
+       ROUND(COALESCE(a.ad_revenue, 0), 2) AS ad_revenue
+FROM (SELECT DISTINCT channel FROM players) c
+LEFT JOIN iap_by_channel i ON i.channel = c.channel
+LEFT JOIN ads_by_channel a ON a.channel = c.channel
+ORDER BY c.channel;
 
 
 -- 10. Payer conversion rate by channel
@@ -182,22 +194,38 @@ JOIN (
 ) cac ON cac.channel = ltv.channel;
 
 
--- 13. Cumulative LTV by day-since-install, by channel (for a payback curve chart)
-SELECT
-    p.channel,
-    DATEDIFF(rev.event_ts, p.install_date) AS day_since_install,
-    SUM(rev.revenue) / COUNT(DISTINCT p.player_id) OVER (
-        PARTITION BY p.channel ORDER BY DATEDIFF(rev.event_ts, p.install_date)
-    ) AS running_ltv_approx
-FROM players p
-JOIN (
+-- 13. Cumulative LTV by day-since-install, by channel (MySQL 8-compatible)
+-- Aggregate daily revenue first, then divide the cumulative revenue by the fixed install cohort size.
+WITH player_revenue AS (
     SELECT player_id, transaction_timestamp AS event_ts, usd_amount AS revenue FROM iap_transactions
     UNION ALL
     SELECT player_id, event_timestamp AS event_ts, revenue_usd AS revenue FROM ad_revenue_events
-) rev ON rev.player_id = p.player_id
-WHERE DATEDIFF(rev.event_ts, p.install_date) BETWEEN 0 AND 90
-GROUP BY p.channel, DATEDIFF(rev.event_ts, p.install_date)
-ORDER BY p.channel, day_since_install;
+),
+channel_installs AS (
+    SELECT channel, COUNT(DISTINCT player_id) AS installs
+    FROM players
+    GROUP BY channel
+),
+daily_revenue AS (
+    SELECT p.channel,
+           DATEDIFF(r.event_ts, p.install_date) AS day_since_install,
+           SUM(r.revenue) AS revenue_usd
+    FROM players p
+    JOIN player_revenue r ON r.player_id = p.player_id
+    WHERE DATEDIFF(r.event_ts, p.install_date) BETWEEN 0 AND 90
+    GROUP BY p.channel, DATEDIFF(r.event_ts, p.install_date)
+)
+SELECT d.channel,
+       d.day_since_install,
+       d.revenue_usd,
+       i.installs,
+       SUM(d.revenue_usd) OVER (
+           PARTITION BY d.channel ORDER BY d.day_since_install
+           ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+       ) / i.installs AS cumulative_ltv
+FROM daily_revenue d
+JOIN channel_installs i ON i.channel = d.channel
+ORDER BY d.channel, d.day_since_install;
 
 
 -- 14. Channels that have NOT paid back within 90 days (LTV < CAC at D90)
@@ -270,7 +298,7 @@ ORDER BY ltv DESC
 LIMIT 5;
 
 
--- 18. Channel x platform CAC-efficiency matrix
+-- 18. Revenue / LTV by channel x platform (UA spend has no platform split, so platform CAC is unavailable)
 SELECT
     p.channel,
     p.platform,
@@ -311,3 +339,61 @@ FROM ad_revenue_events a
 JOIN players p ON p.player_id = a.player_id
 GROUP BY p.channel, a.ad_type
 ORDER BY p.channel, total_ad_revenue DESC;
+
+
+-- 21. CTE: channel-level acquisition summary and CAC ranking.
+WITH channel_totals AS (
+    SELECT channel, SUM(daily_spend_usd) AS total_spend, SUM(installs) AS total_installs
+    FROM ua_spend GROUP BY channel
+),
+channel_metrics AS (
+    SELECT channel, total_spend, total_installs,
+           total_spend / NULLIF(total_installs, 0) AS blended_cac
+    FROM channel_totals
+)
+SELECT channel, total_spend, total_installs, ROUND(blended_cac, 3) AS blended_cac,
+       RANK() OVER (ORDER BY blended_cac) AS cac_rank
+FROM channel_metrics ORDER BY cac_rank, channel;
+
+-- 22. CTE and RANK: channels by D90 LTV / CAC.
+WITH player_revenue AS (
+    SELECT player_id, transaction_timestamp AS event_ts, usd_amount AS revenue FROM iap_transactions
+    UNION ALL
+    SELECT player_id, event_timestamp AS event_ts, revenue_usd AS revenue FROM ad_revenue_events
+),
+channel_ltv AS (
+    SELECT p.channel,
+           SUM(CASE WHEN DATEDIFF(r.event_ts, p.install_date) BETWEEN 0 AND 90 THEN r.revenue ELSE 0 END)
+           / COUNT(DISTINCT p.player_id) AS ltv_d90
+    FROM players p LEFT JOIN player_revenue r ON r.player_id = p.player_id
+    GROUP BY p.channel
+),
+channel_cac AS (
+    SELECT channel, SUM(daily_spend_usd) / NULLIF(SUM(installs), 0) AS blended_cac
+    FROM ua_spend GROUP BY channel
+)
+SELECT l.channel, ROUND(l.ltv_d90, 4) AS ltv_d90, ROUND(c.blended_cac, 4) AS blended_cac,
+       ROUND(l.ltv_d90 / NULLIF(c.blended_cac, 0) * 100, 1) AS roas_d90_pct,
+       RANK() OVER (ORDER BY l.ltv_d90 / NULLIF(c.blended_cac, 0) DESC) AS roas_rank
+FROM channel_ltv l JOIN channel_cac c ON c.channel = l.channel ORDER BY roas_rank;
+
+-- 23. LAG: previous-day spend and install changes by channel.
+WITH daily AS (
+    SELECT spend_date, channel, SUM(daily_spend_usd) AS spend_usd, SUM(installs) AS installs
+    FROM ua_spend GROUP BY spend_date, channel
+)
+SELECT spend_date, channel, spend_usd, installs,
+       LAG(spend_usd) OVER (PARTITION BY channel ORDER BY spend_date) AS prior_day_spend,
+       LAG(installs) OVER (PARTITION BY channel ORDER BY spend_date) AS prior_day_installs,
+       spend_usd - LAG(spend_usd) OVER (PARTITION BY channel ORDER BY spend_date) AS spend_change
+FROM daily ORDER BY channel, spend_date;
+
+-- 24. Running total: cumulative spend and installs by channel.
+WITH daily AS (
+    SELECT spend_date, channel, SUM(daily_spend_usd) AS spend_usd, SUM(installs) AS installs
+    FROM ua_spend GROUP BY spend_date, channel
+)
+SELECT spend_date, channel, spend_usd, installs,
+       SUM(spend_usd) OVER (PARTITION BY channel ORDER BY spend_date ROWS UNBOUNDED PRECEDING) AS cumulative_spend_usd,
+       SUM(installs) OVER (PARTITION BY channel ORDER BY spend_date ROWS UNBOUNDED PRECEDING) AS cumulative_installs
+FROM daily ORDER BY channel, spend_date;

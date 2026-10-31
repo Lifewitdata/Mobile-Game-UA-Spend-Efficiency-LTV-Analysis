@@ -1,214 +1,98 @@
-<div align="center">
+# Mobile Game UA Spend Efficiency & LTV Analysis
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=2,8,14&height=200&section=header&text=UA%20Spend%20%26%20LTV%20Analytics&fontSize=38&fontColor=ffffff&animation=fadeIn&fontAlignY=35&desc=CAC%20%7C%20LTV%20%7C%20ROAS%20%7C%20Payback%20Period%20by%20Channel&descAlignY=55&descSize=17" width="100%"/>
+A reproducible portfolio analysis of synthetic mobile-game user-acquisition spend, player cohorts and monetisation, using the committed CSV snapshot.
 
-<img src="https://readme-typing-svg.demolab.com/svg?font=Fira+Code&weight=500&size=20&duration=3000&pause=800&color=00B4A6&center=true&vCenter=true&width=650&lines=The+cheapest+channel+isn't+the+best+one.;CPI+ranked+these+channels+backwards.;SQL+%2B+Python+%2B+Financial+Analysis" alt="Typing SVG" />
-
-<br/>
-
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Pandas](https://img.shields.io/badge/pandas-2.x-150458?style=for-the-badge&logo=pandas&logoColor=white)
-![SQL](https://img.shields.io/badge/SQL-MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
-![Jupyter](https://img.shields.io/badge/Jupyter-notebooks-F37626?style=for-the-badge&logo=jupyter&logoColor=white)
-![Status](https://img.shields.io/badge/status-complete-success?style=for-the-badge)
-
-</div>
-
-A portfolio project simulating a UA (user acquisition) budget review for a
-mobile game: 90 days of spend across four channels, cohort-based LTV
-tracking, and a quantified budget reallocation recommendation — the kind
-of financial/growth analysis a live-ops or marketing analytics team runs
-every month.
-
-**Built to demonstrate the financial half of mobile game analytics** —
-CAC, LTV, ROAS, and payback period — that pairs with product-side work
-like A/B testing and retention analysis (see the companion
-[Bingo F2P Analytics](../bingo_analytics) project).
-
----
-
-## 🔑 Headline finding
-
-`paid_social` has the **lowest** cost-per-install of the three paid
-channels — but the **worst** return. `cross_promo`, the smallest spend
-line in the portfolio, is the only paid channel that actually pays back
-within 90 days, at 130% ROAS.
-
-<div align="center">
+## Headline findings
 
 | Channel | Blended CAC | D90 LTV | D90 ROAS | Payback |
-|:---:|:---:|:---:|:---:|:---:|
-| 🟢 **cross_promo** | $0.45 | $0.59 | **130.3%** | Day 28 |
-| ⚪ organic | $0.00 | $0.92 | — | Immediate |
-| 🟡 paid_search | $3.16 | $0.97 | 30.8% | Not in 90d |
-| 🔴 **paid_social** | $1.54 | $0.33 | 21.5% | Not in 90d |
+|---|---:|---:|---:|---|
+| cross_promo | **$0.45** | $0.59 | **130.3%** | Day 28 |
+| organic | $0.00* | $0.92 | — | No paid spend |
+| paid_search | $3.16 | $0.97 | 30.8% | Not within observed 90d |
+| paid_social | $1.54 | $0.33 | 21.5% | Not within observed 90d |
 
-</div>
+**cross_promo has the lowest paid-channel blended CAC at $0.45; paid_social is $1.54.** Paid_social marginal CAC increased **60.8%**, from **$1.174** in the first 30 days to **$1.888** in the last 30 days.
 
-> 💡 **CPI alone ranks these channels almost exactly backwards from what
-> the LTV data supports.** paid_social absorbs the largest budget share
-> while returning the least.
+*Organic CAC is zero only because paid acquisition spend is not assigned to organic; this does not mean organic acquisition has no operational cost.*
 
-📄 Full stakeholder readout: [`docs/stakeholder_writeup.md`](docs/stakeholder_writeup.md)
+## Saturation warning
 
-<div align="center">
-<img src="docs/ltv_vs_cac.png" width="80%" alt="Cumulative LTV vs CAC by channel"/>
-</div>
+The weighted reallocation scenario proposes an additional ~$4,762 into cross_promo, whose full historical spend was $976.95. The increase is about **4.9× its total historical spend**. Do not assume the same $0.45 CAC or 130.3% ROAS at that scale. Treat the allocation as a sensitivity scenario only; any live shift should be staged, capped and evaluated using incremental CAC and ROAS.
 
----
-
-## 📑 Table of contents
-
-- [Project structure](#-project-structure)
-- [Data model](#️-data-model)
-- [What each notebook covers](#-what-each-notebook-covers)
-- [Analysis workflow](#-analysis-workflow)
-- [Running it locally](#-running-it-locally)
-- [Stack](#️-stack)
-
----
-
-## 📊 Project structure
+## Repository structure
 
 ```
-ua_ltv_analytics/
-├── generate_data.py              # synthetic UA spend + player + revenue generator
-├── sql/
-│   ├── schema.sql                # table definitions
-│   └── analysis_queries.sql      # 20 business-focused MySQL queries
-├── data/                         # generated CSVs (gitignored — run generator locally)
-├── notebooks/
-│   ├── 01_ua_spend_exploration.ipynb    # spend, blended vs. marginal CPI trend
-│   └── 02_ltv_roas_payback.ipynb        # LTV curves, ROAS, payback, reallocation model
+.
+├── Mobile Game Efficiency & LTV Analysis.ipynb
+├── data/                         # committed source CSVs
+├── dashboard/app.py              # Streamlit dashboard
 ├── docs/
-│   └── stakeholder_writeup.md    # one-page finance-facing readout
-└── requirements.txt
+│   ├── data_dictionary.md
+│   ├── sql_run_guide.md
+│   ├── stakeholder_writeup.md
+│   └── *.png                     # analysis outputs
+├── sql/
+│   ├── schema.sql
+│   └── analysis_queries.sql
+├── scripts/generate_demo_data.py # deterministic QA fixtures; not a baseline overwrite
+├── tests/test_metrics.py
+├── requirements.txt
+├── LICENSE
+└── .github/workflows/validate.yml
 ```
 
-## 🗂️ Data model
+`data/sample_players.csv` is a 20-row sample fixture for inspection and lightweight examples. The full notebook reads only `data/players.csv`.
 
-```mermaid
-erDiagram
-    ua_campaigns ||--o{ ua_spend : has
-    ua_campaigns ||--o{ players : acquires
-    players ||--o{ iap_transactions : makes
-    players ||--o{ ad_revenue_events : generates
+## Run the notebook
 
-    ua_campaigns {
-        int campaign_id PK
-        string channel
-        string campaign_name
-        date start_date
-        date end_date
-    }
-    ua_spend {
-        bigint spend_id PK
-        int campaign_id FK
-        string channel
-        date spend_date
-        decimal daily_spend_usd
-        int installs
-    }
-    players {
-        int player_id PK
-        date install_date
-        string channel
-        int campaign_id FK
-        string country
-        string platform
-    }
-    iap_transactions {
-        bigint transaction_id PK
-        int player_id FK
-        datetime transaction_timestamp
-        string product_type
-        decimal usd_amount
-    }
-    ad_revenue_events {
-        bigint event_id PK
-        int player_id FK
-        datetime event_timestamp
-        string ad_type
-        decimal revenue_usd
-    }
-```
-
----
-
-## 🔄 Analysis workflow
-
-```mermaid
-flowchart LR
-    A[generate_data.py] --> B[01 Spend Exploration]
-    B -->|CAC by channel| C[02 LTV / ROAS / Payback]
-    C --> D[Reallocation Model]
-    D --> E[Stakeholder Writeup]
-
-    style A fill:#00B4A6,color:#fff
-    style B fill:#FF6B6B,color:#fff
-    style C fill:#4ECDC4,color:#fff
-    style D fill:#FFD93D,color:#000
-    style E fill:#6C63FF,color:#fff
-```
-
----
-
-## 🔍 What each notebook covers
-
-<details open>
-<summary><b>📓 01 — UA Spend Exploration & CAC</b></summary>
-<br/>
-
-- Total spend, installs, and blended CAC by channel
-- Daily CPI trend, 7-day rolling average
-- **First-30-days vs. last-30-days CAC comparison** — catches `paid_social`'s
-  marginal cost nearly doubling over the window, a fact the blended average
-  hides completely.
-
-</details>
-
-<details>
-<summary><b>📓 02 — LTV, ROAS & Payback Period</b> (the core deliverable)</summary>
-<br/>
-
-- Combines IAP + ad revenue into a single per-player LTV timeline
-- Cumulative LTV curves vs. CAC, by channel, over a 90-day window
-- Payback day calculation (first day cumulative LTV crosses CAC)
-- D90 ROAS by channel
-- A quantified budget reallocation model — dollars and installs, not just
-  a verbal recommendation
-
-</details>
-
----
-
-## 🚀 Running it locally
+Python 3.11 recommended.
 
 ```bash
-pip install -r requirements.txt
-python generate_data.py          # generates data/*.csv (~30 sec)
-jupyter notebook notebooks/       # run 01 → 02, in order
+git clone https://github.com/Lifewitdata/Mobile-Game-UA-Spend-Efficiency-LTV-Analysis.git
+cd Mobile-Game-UA-Spend-Efficiency-LTV-Analysis
+python -m venv .venv
+# Windows: .venv\\Scripts\\activate
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -r requirements.txt
+jupyter lab
 ```
 
----
+Open `Mobile Game Efficiency & LTV Analysis.ipynb` at the repository root and run all cells top to bottom. Inputs default to `data/`; figures are saved under `docs/`.
 
-## 🛠️ Stack
+To generate a separate deterministic synthetic dataset without overwriting the committed snapshot:
 
-<div align="center">
+```bash
+python scripts/generate_demo_data.py
+```
 
-![Python](https://img.shields.io/badge/-Python-3776AB?style=flat-square&logo=python&logoColor=white)
-![pandas](https://img.shields.io/badge/-pandas-150458?style=flat-square&logo=pandas&logoColor=white)
-![NumPy](https://img.shields.io/badge/-NumPy-013243?style=flat-square&logo=numpy&logoColor=white)
-![Matplotlib](https://img.shields.io/badge/-Matplotlib-11557C?style=flat-square)
-![SQL](https://img.shields.io/badge/-SQL-4479A1?style=flat-square&logo=mysql&logoColor=white)
-![Jupyter](https://img.shields.io/badge/-Jupyter-F37626?style=flat-square&logo=jupyter&logoColor=white)
+The script writes all five analysis CSVs plus a 20-row sample to `data/generated_demo/`. Use that alternative dataset by setting `UA_DATA_DIR=data/generated_demo` before starting Jupyter or Streamlit. The generated sample is a new synthetic scenario, not an exact recreation of the committed snapshot or its headline LTV/revenue results.
 
-</div>
+## Dashboard
 
-Financial/growth methods: blended vs. marginal CAC, cohort-based LTV,
-payback period, ROAS, quantified budget reallocation modeling.
+```bash
+streamlit run dashboard/app.py
+```
 
-<div align="center">
-<br/>
-<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=2,8,14&height=100&section=footer" width="100%"/>
-</div>
+The dashboard shows channel CAC, spend/install trends and country/platform mix. It reads the existing committed dataset; a hosted deployment is not configured.
+
+## SQL
+
+The query library targets **MySQL 8.0+**. Follow [docs/sql_run_guide.md](docs/sql_run_guide.md) to create the database, run the schema, import CSV files and verify counts and headline CAC outputs. Queries include CTEs, `RANK`, `LAG`, running totals and rolling averages.
+
+## Metric and source limitations
+
+See [docs/data_dictionary.md](docs/data_dictionary.md) for table grain, metric definitions and quality rules. The data provides spend, installs, country, platform, purchase transactions and ad-revenue events by ad type. It has no ad impressions/requests, app IDs, demand-partner IDs, sessions/activity, experiment assignment or exposure. Thus CTR, CVR, CPC, fill rate, eCPM, retention, app/partner splits and causal A/B statistics cannot be calculated; they are not fabricated.
+
+D120/D180 LTV is calculated only for cohorts with complete observation windows. The notebook will report when no cohort is eligible.
+
+## Validate
+
+```bash
+pytest -q
+```
+
+GitHub Actions runs the tests and validates notebook JSON on pushes and pull requests.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
