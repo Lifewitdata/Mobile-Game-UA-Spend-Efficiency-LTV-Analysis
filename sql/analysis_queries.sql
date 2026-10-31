@@ -194,22 +194,38 @@ JOIN (
 ) cac ON cac.channel = ltv.channel;
 
 
--- 13. Cumulative LTV by day-since-install, by channel (for a payback curve chart)
-SELECT
-    p.channel,
-    DATEDIFF(rev.event_ts, p.install_date) AS day_since_install,
-    SUM(rev.revenue) / COUNT(DISTINCT p.player_id) OVER (
-        PARTITION BY p.channel ORDER BY DATEDIFF(rev.event_ts, p.install_date)
-    ) AS running_ltv_approx
-FROM players p
-JOIN (
+-- 13. Cumulative LTV by day-since-install, by channel (MySQL 8-compatible)
+-- Aggregate daily revenue first, then divide the cumulative revenue by the fixed install cohort size.
+WITH player_revenue AS (
     SELECT player_id, transaction_timestamp AS event_ts, usd_amount AS revenue FROM iap_transactions
     UNION ALL
     SELECT player_id, event_timestamp AS event_ts, revenue_usd AS revenue FROM ad_revenue_events
-) rev ON rev.player_id = p.player_id
-WHERE DATEDIFF(rev.event_ts, p.install_date) BETWEEN 0 AND 90
-GROUP BY p.channel, DATEDIFF(rev.event_ts, p.install_date)
-ORDER BY p.channel, day_since_install;
+),
+channel_installs AS (
+    SELECT channel, COUNT(DISTINCT player_id) AS installs
+    FROM players
+    GROUP BY channel
+),
+daily_revenue AS (
+    SELECT p.channel,
+           DATEDIFF(r.event_ts, p.install_date) AS day_since_install,
+           SUM(r.revenue) AS revenue_usd
+    FROM players p
+    JOIN player_revenue r ON r.player_id = p.player_id
+    WHERE DATEDIFF(r.event_ts, p.install_date) BETWEEN 0 AND 90
+    GROUP BY p.channel, DATEDIFF(r.event_ts, p.install_date)
+)
+SELECT d.channel,
+       d.day_since_install,
+       d.revenue_usd,
+       i.installs,
+       SUM(d.revenue_usd) OVER (
+           PARTITION BY d.channel ORDER BY d.day_since_install
+           ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+       ) / i.installs AS cumulative_ltv
+FROM daily_revenue d
+JOIN channel_installs i ON i.channel = d.channel
+ORDER BY d.channel, d.day_since_install;
 
 
 -- 14. Channels that have NOT paid back within 90 days (LTV < CAC at D90)
