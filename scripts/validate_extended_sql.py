@@ -9,6 +9,10 @@ import mysql.connector
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = Path(os.environ.get("UA_DATA_DIR", ROOT / "data" / "generated_extended")).resolve()
+sys.path.insert(0, str(ROOT / "scripts"))
+import validate_sql as baseline_loader
+
+baseline_loader.DATA = DATA
 TABLE_FILES = {
     "apps": ("apps.csv", ["app_id", "app_name", "genre", "package_name"]),
     "demand_partners": ("demand_partners.csv", ["demand_partner_id", "partner_name", "mediation_group"]),
@@ -62,18 +66,25 @@ def main() -> None:
             if statement.strip():
                 cursor.execute(statement)
 
-        # Clean extension child tables in FK-safe order so the validator is repeatable.
+        # Clear extension tables, then replace baseline facts with the matching generated fixture.
         for table in [
             "experiment_player_outcomes", "ad_delivery_events", "experiment_exposures",
             "experiment_assignments", "player_sessions", "player_app_mapping",
             "demand_partners", "apps",
         ]:
             cursor.execute(f"DELETE FROM {table}")
+        for table in ["ad_revenue_events", "iap_transactions", "players", "ua_spend", "ua_campaigns"]:
+            cursor.execute(f"DELETE FROM {table}")
+
+        baseline_counts = {}
+        for table, spec in baseline_loader.TABLES.items():
+            baseline_counts[table] = baseline_loader.load_table(cursor, table, spec)
 
         counts = {}
         for table, (filename, columns) in TABLE_FILES.items():
             counts[table] = load_csv(cursor, table, filename, columns)
         connection.commit()
+        print("Loaded matching generated baseline tables:", baseline_counts)
         print("Loaded extended synthetic tables:", counts)
 
         cursor.execute("SELECT COUNT(*) FROM ad_delivery_events")
