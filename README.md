@@ -57,7 +57,15 @@ python -m pip install -r requirements.txt
 jupyter lab
 ```
 
-Open `Mobile Game Efficiency & LTV Analysis.ipynb` at the repository root and run all cells top to bottom. Inputs are loaded using `Path("data")`; figures are saved under `docs/`.
+Open `Mobile Game Efficiency & LTV Analysis.ipynb` at the repository root and run all cells top to bottom. Inputs default to `data/`; figures are saved under `docs/`.
+
+To generate a separate deterministic synthetic dataset without overwriting the committed snapshot:
+
+```bash
+python scripts/generate_demo_data.py
+```
+
+The script writes all five analysis CSVs plus a 20-row sample to `data/generated_demo/`. Use that alternative dataset by setting `UA_DATA_DIR=data/generated_demo` before starting Jupyter or Streamlit. The generated sample is a new synthetic scenario, not an exact recreation of the committed snapshot or its headline LTV/revenue results.
 
 ## Dashboard
 
