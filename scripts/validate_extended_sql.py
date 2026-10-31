@@ -57,6 +57,11 @@ def main() -> None:
     )
     cursor = connection.cursor()
     try:
+        schema = strip_comment_lines((ROOT / "sql" / "extended_demo_schema.sql").read_text(encoding="utf-8"))
+        for statement in schema.split(";"):
+            if statement.strip():
+                cursor.execute(statement)
+
         # Clean extension child tables in FK-safe order so the validator is repeatable.
         for table in [
             "experiment_player_outcomes", "ad_delivery_events", "experiment_exposures",
@@ -64,11 +69,6 @@ def main() -> None:
             "demand_partners", "apps",
         ]:
             cursor.execute(f"DELETE FROM {table}")
-
-        schema = strip_comment_lines((ROOT / "sql" / "extended_demo_schema.sql").read_text(encoding="utf-8"))
-        for statement in schema.split(";"):
-            if statement.strip():
-                cursor.execute(statement)
 
         counts = {}
         for table, (filename, columns) in TABLE_FILES.items():
