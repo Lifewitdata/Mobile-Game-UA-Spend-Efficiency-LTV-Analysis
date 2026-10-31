@@ -30,8 +30,8 @@ channel["blended_cac"] = channel["spend_usd"] / channel["installs"].replace(0, p
 paid = channel[channel.channel != "organic"].sort_values("blended_cac")
 
 a, b, c = st.columns(3)
-a.metric("Lowest paid-channel CAC", f"\${paid.iloc[0].blended_cac:.2f}", paid.iloc[0].channel)
-b.metric("Total UA spend", f"\${channel.spend_usd.sum():,.0f}")
+a.metric("Lowest paid-channel CAC", f"${paid.iloc[0].blended_cac:.2f}", paid.iloc[0].channel)
+b.metric("Total UA spend", f"${channel.spend_usd.sum():,.0f}")
 c.metric("Attributed installs", f"{channel.installs.sum():,}")
 
 st.subheader("Blended CAC by channel")
@@ -97,7 +97,7 @@ if EXTENDED_FILES.issubset({path.name for path in DATA.glob("*.csv")}):
     k1.metric("Ad requests", f"{request_count:,}")
     k2.metric("Fill rate", f"{fill_rate:.1%}")
     k3.metric("CTR", f"{ctr:.2%}")
-    k4.metric("eCPM", f"\${ecpm:.2f}")
+    k4.metric("eCPM", f"${ecpm:.2f}")
 
     st.subheader("Ad delivery by app and demand partner")
     summary = ads.groupby(["app_id", "demand_partner_id"], as_index=False).agg(
@@ -166,7 +166,7 @@ if EXTENDED_FILES.issubset({path.name for path in DATA.glob("*.csv")}):
         revenue_delta = arms.loc["treatment", "avg_revenue_first_7d"] - arms.loc["control", "avg_revenue_first_7d"]
         m1, m2 = st.columns(2)
         m1.metric("D7 retention difference (treatment − control)", f"{d7_delta:+.2f} pp")
-        m2.metric("7-day revenue / assigned player difference", f"\${revenue_delta:+.4f}")
+        m2.metric("7-day revenue / assigned player difference", f"${revenue_delta:+.4f}")
     st.info(
         "Use assigned variant for the primary intention-to-treat comparison; exposure rate is a delivery diagnostic. "
         "Assignments and treatment response are simulated. Differences shown here are not evidence of a live-game causal effect."
