@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import altair as alt
@@ -5,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data"
+DATA = Path(os.environ.get("UA_DATA_DIR", ROOT / "data")).resolve()
 
 st.set_page_config(page_title="Mobile Game UA Efficiency", layout="wide")
 st.title("Mobile Game UA Spend Efficiency")
