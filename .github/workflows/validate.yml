@@ -7,6 +7,25 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_root_password
+          MYSQL_DATABASE: mobile_game_ua
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci_root_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ci_root_password
+      MYSQL_DATABASE: mobile_game_ua
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,5 +38,7 @@ jobs:
           python scripts/generate_demo_data.py --output-dir /tmp/generated_demo
           python -c "import pandas as pd; from pathlib import Path; d=Path('/tmp/generated_demo'); assert len(pd.read_csv(d/'players.csv')) == 26245; assert len(pd.read_csv(d/'ad_revenue_events.csv')) == 107944"
       - run: python -m json.tool "Mobile Game Efficiency & LTV Analysis.ipynb" > /dev/null
+      - name: Execute MySQL schema, import CSVs and run SQL library
+        run: python scripts/validate_sql.py
       - name: Execute notebook from repository root
         run: jupyter nbconvert --to notebook --execute "Mobile Game Efficiency & LTV Analysis.ipynb" --output /tmp/mobile-game-analysis-executed.ipynb --ExecutePreprocessor.timeout=600
