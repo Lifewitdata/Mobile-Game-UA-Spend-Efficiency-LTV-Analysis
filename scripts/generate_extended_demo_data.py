@@ -303,3 +303,7 @@ def main() -> None:
     for name, count in counts.items():
         print(f"  {name}: {count:,}")
     print("All added tables are generated demonstration data, not observed production telemetry.")
+
+
+if __name__ == "__main__":
+    main()
