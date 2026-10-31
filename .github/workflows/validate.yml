@@ -48,5 +48,9 @@ jobs:
       - run: python -m json.tool "Mobile Game Efficiency & LTV Analysis.ipynb" > /dev/null
       - name: Execute MySQL schema, import CSVs and run baseline SQL library
         run: python scripts/validate_sql.py
+      - name: Execute extended synthetic schema and SQL library
+        env:
+          UA_DATA_DIR: /tmp/generated_extended
+        run: python scripts/validate_extended_sql.py
       - name: Execute notebook from repository root
         run: jupyter nbconvert --to notebook --execute "Mobile Game Efficiency & LTV Analysis.ipynb" --output /tmp/mobile-game-analysis-executed.ipynb --ExecutePreprocessor.timeout=600
