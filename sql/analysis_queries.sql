@@ -282,7 +282,7 @@ ORDER BY ltv DESC
 LIMIT 5;
 
 
--- 18. Channel x platform CAC-efficiency matrix
+-- 18. Revenue / LTV by channel x platform (UA spend has no platform split, so platform CAC is unavailable)
 SELECT
     p.channel,
     p.platform,
