@@ -85,9 +85,10 @@ def generate(output: Path, seed: int = 42) -> None:
               ["player_id", "install_date", "channel", "campaign_id", "country", "platform"],
               player_rows[:20])
 
+    player_ids = list(players_by_id)
     iap_rows = []
     for transaction_id in range(1, 1652):
-        pid = rng.choice(list(players_by_id))
+        pid = rng.choice(player_ids)
         install_date = players_by_id[pid]
         event_date = install_date + timedelta(days=rng.randint(0, min(89, (EVENT_END - install_date).days)))
         product_type, amount = rng.choice(PRODUCTS)
@@ -98,7 +99,7 @@ def generate(output: Path, seed: int = 42) -> None:
 
     ad_rows = []
     for event_id in range(1, 107945):
-        pid = rng.choice(list(players_by_id))
+        pid = rng.choice(player_ids)
         install_date = players_by_id[pid]
         max_age = max(0, (EVENT_END - install_date).days)
         event_date = install_date + timedelta(days=rng.randint(0, max_age))
