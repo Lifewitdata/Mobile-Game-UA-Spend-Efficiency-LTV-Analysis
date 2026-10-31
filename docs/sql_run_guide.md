@@ -45,3 +45,14 @@ Expected paid-channel ordering for the committed snapshot: cross_promo ($0.45), 
 ## 4. Execute query library
 
 Run [../sql/analysis_queries.sql](../sql/analysis_queries.sql). Queries 21–24 demonstrate CTEs, `RANK`, `LAG` and running totals. No execution output is committed; the verification queries above are the expected sanity checks.
+
+
+## Automated SQL execution
+
+The GitHub Actions workflow starts MySQL 8.0, creates tables from the schema, loads all committed CSVs, executes every statement in the SQL library, and checks the known paid-channel CAC ordering. To run this locally, install the pinned requirements, start a MySQL 8.0 server, set `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD` and `MYSQL_DATABASE`, then run:
+
+```bash
+python scripts/validate_sql.py
+```
+
+The script prints the number of query statements successfully executed and validates the expected CAC outputs. It does not publish database credentials.
