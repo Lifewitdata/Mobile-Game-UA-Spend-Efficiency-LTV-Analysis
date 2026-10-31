@@ -116,15 +116,27 @@ LEFT JOIN (
 GROUP BY p.channel;
 
 
--- 9. IAP-only vs ad-only revenue split, by channel
-SELECT
-    p.channel,
-    ROUND(COALESCE(SUM(i.usd_amount), 0), 2) AS iap_revenue,
-    ROUND(COALESCE(SUM(a.revenue_usd), 0), 2) AS ad_revenue
-FROM players p
-LEFT JOIN iap_transactions i ON i.player_id = p.player_id
-LEFT JOIN ad_revenue_events a ON a.player_id = p.player_id
-GROUP BY p.channel;
+-- 9. IAP-only vs ad-only revenue split, by channel.
+-- Aggregate each event table before joining to avoid IAP x ad-event fan-out.
+WITH iap_by_channel AS (
+    SELECT p.channel, SUM(i.usd_amount) AS iap_revenue
+    FROM players p
+    JOIN iap_transactions i ON i.player_id = p.player_id
+    GROUP BY p.channel
+),
+ads_by_channel AS (
+    SELECT p.channel, SUM(a.revenue_usd) AS ad_revenue
+    FROM players p
+    JOIN ad_revenue_events a ON a.player_id = p.player_id
+    GROUP BY p.channel
+)
+SELECT c.channel,
+       ROUND(COALESCE(i.iap_revenue, 0), 2) AS iap_revenue,
+       ROUND(COALESCE(a.ad_revenue, 0), 2) AS ad_revenue
+FROM (SELECT DISTINCT channel FROM players) c
+LEFT JOIN iap_by_channel i ON i.channel = c.channel
+LEFT JOIN ads_by_channel a ON a.channel = c.channel
+ORDER BY c.channel;
 
 
 -- 10. Payer conversion rate by channel
