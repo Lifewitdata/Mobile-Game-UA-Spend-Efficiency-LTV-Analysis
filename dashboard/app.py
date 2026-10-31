@@ -30,8 +30,8 @@ channel["blended_cac"] = channel["spend_usd"] / channel["installs"].replace(0, p
 paid = channel[channel.channel != "organic"].sort_values("blended_cac")
 
 a, b, c = st.columns(3)
-a.metric("Lowest paid-channel CAC", f"${paid.iloc[0].blended_cac:.2f}", paid.iloc[0].channel)
-b.metric("Total UA spend", f"${channel.spend_usd.sum():,.0f}")
+a.metric("Lowest paid-channel CAC", f"\${paid.iloc[0].blended_cac:.2f}", paid.iloc[0].channel)
+b.metric("Total UA spend", f"\${channel.spend_usd.sum():,.0f}")
 c.metric("Attributed installs", f"{channel.installs.sum():,}")
 
 st.subheader("Blended CAC by channel")
@@ -88,16 +88,16 @@ if EXTENDED_FILES.issubset({path.name for path in DATA.glob("*.csv")}):
     request_count = len(ads)
     impression_count = int(ads["is_impression"].sum())
     click_count = int(ads["is_click"].sum())
-    revenue = ads["revenue_usd"].sum()
+    ad_revenue = ads["revenue_usd"].sum()
     fill_rate = impression_count / request_count if request_count else 0
     ctr = click_count / impression_count if impression_count else 0
-    ecpm = revenue / impression_count * 1000 if impression_count else 0
+    ecpm = ad_revenue / impression_count * 1000 if impression_count else 0
 
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Ad requests", f"{request_count:,}")
     k2.metric("Fill rate", f"{fill_rate:.1%}")
     k3.metric("CTR", f"{ctr:.2%}")
-    k4.metric("eCPM", f"${ecpm:.2f}")
+    k4.metric("eCPM", f"\${ecpm:.2f}")
 
     st.subheader("Ad delivery by app and demand partner")
     summary = ads.groupby(["app_id", "demand_partner_id"], as_index=False).agg(
@@ -125,7 +125,11 @@ if EXTENDED_FILES.issubset({path.name for path in DATA.glob("*.csv")}):
     cohort_players = cohort_players[
         cohort_players["install_date"] + pd.to_timedelta(retention_day, unit="D") <= max_observed_date
     ]
-    active = sessions.loc[sessions["session_day"] == retention_day, ["player_id"]].drop_duplicates().merge(
+    eligible_player_ids = set(cohort_players["player_id"])
+    active = sessions.loc[
+        (sessions["session_day"] == retention_day) & sessions["player_id"].isin(eligible_player_ids),
+        ["player_id"],
+    ].drop_duplicates().merge(
         players[["player_id", "install_date"]], on="player_id", how="inner"
     )
     active["install_week"] = active["install_date"].dt.to_period("W").dt.start_time
@@ -156,9 +160,16 @@ if EXTENDED_FILES.issubset({path.name for path in DATA.glob("*.csv")}):
         experiment[["assigned_variant", "assigned_players", "d7_retention_pct", "avg_sessions_first_7d", "avg_revenue_first_7d", "exposure_rate_pct"]],
         use_container_width=True,
     )
+    if {"control", "treatment"}.issubset(set(experiment["assigned_variant"])):
+        arms = experiment.set_index("assigned_variant")
+        d7_delta = (arms.loc["treatment", "d7_retention"] - arms.loc["control", "d7_retention"]) * 100
+        revenue_delta = arms.loc["treatment", "avg_revenue_first_7d"] - arms.loc["control", "avg_revenue_first_7d"]
+        m1, m2 = st.columns(2)
+        m1.metric("D7 retention difference (treatment − control)", f"{d7_delta:+.2f} pp")
+        m2.metric("7-day revenue / assigned player difference", f"\${revenue_delta:+.4f}")
     st.info(
         "Use assigned variant for the primary intention-to-treat comparison; exposure rate is a delivery diagnostic. "
-        "Assignments and treatment response are simulated. These differences are not evidence of a live-game causal effect."
+        "Assignments and treatment response are simulated. Differences shown here are not evidence of a live-game causal effect."
     )
 else:
     st.info(
