@@ -88,6 +88,14 @@ The dashboard then adds ad requests, fill rate, CTR, eCPM, app/partner cuts, coh
 
 **Important:** every additional app ID, partner ID, ad-delivery event, session, assignment, exposure and experiment outcome is generated demonstration data. The frequency-cap scenario intentionally simulates a treatment mechanism. Its outputs are not production evidence and must not be represented as real causal findings. Do not combine `ad_revenue_events.csv` and `ad_delivery_events.csv` into one ad ledger.
 
+## Tableau Public dashboard
+
+The project also includes a Tableau Public visualisation built using the synthetic mobile-game cohort dataset:
+
+- **Dashboard 02 — Cohort Retention & LTV Lab:** [View on Tableau Public](https://public.tableau.com/app/profile/isfaque.ansari5273/viz/Mobile_Game_Analytics/02-CohortRetentionLTVLab)
+
+The dashboard explores cohort retention and lifetime value metrics. The underlying data is synthetic and intended for portfolio demonstration; it is not production or client data.
+
 ## SQL
 
 Baseline SQL targets **MySQL 8.0+**. Follow [docs/sql_run_guide.md](docs/sql_run_guide.md) for the original schema and queries. To analyse extended tables, run `sql/extended_demo_schema.sql` after `sql/schema.sql`, then use `sql/extended_demo_queries.sql`.
